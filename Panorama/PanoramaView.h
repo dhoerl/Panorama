@@ -1,6 +1,3 @@
-#import <Foundation/Foundation.h>
-#import <GLKit/GLKit.h>
-
 /**
  * @class Panorama View
  * @author Robby Kraft
@@ -10,6 +7,13 @@
  *
  * @discussion a dynamic GLKView with a touch and motion sensor interface to align and immerse the perspective inside an equirectangular panorama projection
  */
+
+#ifdef FROGGY1
+
+#import <Foundation/Foundation.h>
+#import <GLKit/GLKit.h>
+
+
 @interface PanoramaView : GLKView
 
 
@@ -125,3 +129,9 @@
 -(BOOL) touchInRect:(CGRect)rect;
 
 @end
+
+#else
+
+#import "Panorama-Swift.h"
+
+#endif

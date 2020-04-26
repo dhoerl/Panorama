@@ -7,8 +7,16 @@
 //
 
 #import "ViewController.h"
-#import "PanoramaView.h"
 
+//#ifdef PAN_OBJC
+
+//#define FROGGY1
+#import "PanoramaView.h"
+//#import "Panorama-Swift.h"
+
+//#endif
+
+#define PANORAMA PanoramaView
 @interface ViewController (){
 	PanoramaView *panoramaView;
 }
@@ -18,20 +26,24 @@
 
 - (void)viewDidLoad{
 	[super viewDidLoad];
-	panoramaView = [[PanoramaView alloc] init];
+
+	panoramaView = [PanoramaView new];
 	[panoramaView setImageWithName:@"park_2048.jpg"];
 	[panoramaView setOrientToDevice:YES];
-	[panoramaView setTouchToPan:NO];
+
+    panoramaView.touchToPan = YES;
+    panoramaView.lockPanToHorizon = NO;
+
 	[panoramaView setPinchToZoom:YES];
-	[panoramaView setShowTouches:NO];
-	[panoramaView setVRMode:NO];
+	[panoramaView setShowTouches:YES];
+	panoramaView.VRMode = NO;
+
 	[self setView:panoramaView];
 }
 
 -(void) glkView:(GLKView *)view drawInRect:(CGRect)rect{
 	[panoramaView draw];
 }
-
 
 // uncomment everything below to make a VR-Mode switching button
 
