@@ -40,6 +40,7 @@ private struct Pointer {
     }
 }
 
+//@objcMembers
 final class Sphere: NSObject {
     //  from Touch Fighter by Apple
     //  in Pro OpenGL ES for iOS

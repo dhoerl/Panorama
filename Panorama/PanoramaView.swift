@@ -29,11 +29,11 @@ final class PanoramaView: GLKView {
     private static let Z_FAR: Float = 100.0
 
     private var SENSOR_ORIENTATION: UIInterfaceOrientation { UIApplication.shared.statusBarOrientation }
-    private let motionManager: CMMotionManager = CMMotionManager()
-    private lazy var sphere: Sphere = { Sphere(48, slices: 48, radius: 10.0, textureFile: nil) }()
-    private lazy var meridians: Sphere = { Sphere(48, slices: 48, radius: 8.0, textureFile: "equirectangular-projection-lines.png") }()
-    private lazy var pinchGesture: UIPinchGestureRecognizer = { UIPinchGestureRecognizer(target: self, action: #selector(pinchHandler(_:))) }()
-    private lazy var panGesture: UIPanGestureRecognizer = {  UIPanGestureRecognizer(target: self, action: #selector(panHandler(_:))) }()
+    private lazy var motionManager: CMMotionManager = CMMotionManager()
+    private lazy var sphere: Sphere = Sphere(48, slices: 48, radius: 10.0, textureFile: nil)
+    private lazy var meridians: Sphere = Sphere(48, slices: 48, radius: 8.0, textureFile: "equirectangular-projection-lines.png")
+    private lazy var pinchGesture: UIPinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinchHandler(_:)))
+    private lazy var panGesture: UIPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(panHandler(_:)))
     private var projectionMatrix: GLKMatrix4 = GLKMatrix4Identity
     private var attitudeMatrix: GLKMatrix4 = GLKMatrix4Identity
     private var offsetMatrix: GLKMatrix4 = GLKMatrix4Identity
@@ -76,6 +76,7 @@ final class PanoramaView: GLKView {
             _imageWithName
         }
         set(imageWithName) {
+            _imageWithName = imageWithName
             sphere.swapTexture(imageWithName)
         }
     }
@@ -86,6 +87,7 @@ final class PanoramaView: GLKView {
             _image
         }
         set(image) {
+            _image = image
             sphere.swapTexture(image: image)
         }
     }
@@ -113,7 +115,7 @@ final class PanoramaView: GLKView {
     }
     /// Activates accelerometer + gyro orientation
     private var _orientToDevice = false
-    @objc var  orientToDevice: Bool {
+    @objc var orientToDevice: Bool {
         // At this point, it's still recommended to activate either OrientToDevice or TouchToPan, not both
         // it's possible to have them simultaneously, but the effect is confusing and disorienting
         get {
@@ -132,11 +134,12 @@ final class PanoramaView: GLKView {
     }
     /// Split screen mode for use in VR headsets
     private var _vrMode = false
-    @objc var  VRMode: Bool {
+    @objc var VRMode: Bool {
         get {
             _vrMode
         }
         set(VRMode) {
+            _vrMode = VRMode
             if VRMode {
                 aspectRatio = Float(frame.size.width / (frame.size.height * 0.5))
                 rebuildProjectionMatrix()

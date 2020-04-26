@@ -1,5 +1,5 @@
 //
-//  Prefix header
+//  Panorama-Prefix.pch
 //
 //  The contents of this file are implicitly included at the beginning of every source file.
 //
@@ -14,3 +14,13 @@
     #import <UIKit/UIKit.h>
     #import <Foundation/Foundation.h>
 #endif
+
+//To use the Objective C classes, do this
+// 1- Uncomment the below
+//#define FROGGY1
+//#define FROGGY2
+
+// 2- add "@objcMembers" to Sphere.swift
+
+// 3- include both Swift classes in the build (right pane, check the box)
+// 4- uncheck the two Objective C classes in the right build includes pane

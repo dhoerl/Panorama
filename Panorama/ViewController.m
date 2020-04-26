@@ -8,15 +8,8 @@
 
 #import "ViewController.h"
 
-//#ifdef PAN_OBJC
-
-//#define FROGGY1
 #import "PanoramaView.h"
-//#import "Panorama-Swift.h"
 
-//#endif
-
-#define PANORAMA PanoramaView
 @interface ViewController (){
 	PanoramaView *panoramaView;
 }

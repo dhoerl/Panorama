@@ -33,8 +33,8 @@
 		D5FAE0B117C895AB00AE6EC9 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5FAE0B017C895AB00AE6EC9 /* CoreMotion.framework */; };
 		D5FAE0B317C895B200AE6EC9 /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5FAE0B217C895B200AE6EC9 /* GLKit.framework */; };
 		D5FAE0B517C895BE00AE6EC9 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5FAE0B417C895BE00AE6EC9 /* OpenGLES.framework */; };
-		DEDAD7DE2455DC8B00431DCA /* Sphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE17D7092443B6FF004F8B97 /* Sphere.swift */; };
-		DEDAD7DF2455DC9100431DCA /* PanoramaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE75AF9E2443B00E004F856D /* PanoramaView.swift */; };
+		DEDAD8192456056C00431DCA /* PanoramaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE75AF9E2443B00E004F856D /* PanoramaView.swift */; };
+		DEDAD81A2456058000431DCA /* Sphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE17D7092443B6FF004F8B97 /* Sphere.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -335,8 +335,8 @@
 			files = (
 				D55E8FB21828D2360076A9D7 /* AppDelegate.m in Sources */,
 				D55E8FC61828D2360076A9D7 /* ViewController.m in Sources */,
-				DEDAD7DF2455DC9100431DCA /* PanoramaView.swift in Sources */,
-				DEDAD7DE2455DC8B00431DCA /* Sphere.swift in Sources */,
+				DEDAD81A2456058000431DCA /* Sphere.swift in Sources */,
+				DEDAD8192456056C00431DCA /* PanoramaView.swift in Sources */,
 				D55E8FC01828D2360076A9D7 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
