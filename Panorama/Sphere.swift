@@ -18,7 +18,7 @@ private typealias WithRawPtr = (UnsafeRawPointer) -> Void
 
 private struct Pointer {
     private var array: Array<GLfloat>
-    private var offset: Int = 0
+    private(set) var offset: Int = 0
     private let increment: Int
 
     init(size: Int, increment: Int) {
@@ -32,6 +32,7 @@ private struct Pointer {
     }
 
     mutating func advance() { offset += increment }
+    mutating func reset() { offset = 0 }
 
     mutating func usingRawPointer(block: WithRawPtr) {
         array.withUnsafeBytes { (bufPtr) -> Void in
@@ -40,6 +41,62 @@ private struct Pointer {
     }
 }
 
+private struct Pointer2 {
+    private var array: [SIMD2<Float>]
+
+    init(size: Int) {
+        let n: SIMD2<Float> = [Float.nan, Float.nan]
+
+        array = Array<SIMD2<Float>>(repeating: n, count: size)
+print("SIZE:", MemoryLayout<SIMD2<Float>>.size, MemoryLayout<SIMD2<Float>>.stride, MemoryLayout<SIMD2<Float>>.alignment)
+    }
+
+    subscript(index: Int) -> SIMD2<Float>{
+        get { return array[index] }
+        set(newValue) { array[index] = newValue }
+    }
+
+    mutating func usingRawPointer(block: WithRawPtr) {
+        array.withUnsafeBytes { (bufPtr) -> Void in
+            block(bufPtr.baseAddress!)
+        }
+    }
+}
+private struct Pointer3 {
+    private var array: [SIMD3<Float>]
+    private var a: Array<Float>
+
+    init(size: Int) {
+        a = Array<Float>(repeating: Float.nan, count: size * 3)
+        let n: SIMD3<Float> = [Float.nan, Float.nan, Float.nan]
+        array = Array<SIMD3<Float>>(repeating: n, count: size)
+print("SIZE:", MemoryLayout<SIMD3<Float>>.size, MemoryLayout<SIMD3<Float>>.stride, MemoryLayout<SIMD3<Float>>.alignment)
+    }
+
+    private mutating func flatten() {
+        var index = 0
+        for simd in array {
+            a[index] = simd.x
+            a[index+1] = simd.y
+            a[index+2] = simd.z
+            index += 3
+        }
+    }
+
+    subscript(index: Int) -> SIMD3<Float>{
+        get { return array[index] }
+        set(newValue) { array[index] = newValue }
+    }
+
+    mutating func usingRawPointer(block: WithRawPtr) {
+        flatten()
+        a.withUnsafeBytes { (bufPtr) -> Void in
+            block(bufPtr.baseAddress!)
+        }
+    }
+}
+
+
 //@objcMembers
 final class Sphere: NSObject {
     //  from Touch Fighter by Apple
@@ -47,9 +104,13 @@ final class Sphere: NSObject {
     //  by Mike Smithwick Jan 2011 pg. 78
     private var m_TextureInfo: GLKTextureInfo?
 
+#if false
     private var tPtr: Pointer   // m_TexCoordsData
     private var vPtr: Pointer   // m_VertexData
-    private var nPtr: Pointer   // m_NormalData
+#else
+    private var tPtr: Pointer2   // m_TexCoordsData
+    private var vPtr: Pointer3   // m_VertexData
+#endif
 
     private let m_Stacks: GLint
     private let m_Slices: GLint
@@ -64,12 +125,16 @@ final class Sphere: NSObject {
         m_Stacks = stacks
         m_Slices = slices
 
+#if false
         let sizeOfGLfloat = GLint(MemoryLayout<GLfloat>.size)
         let commonSize = Int(sizeOfGLfloat * ((m_Slices*2+2) * m_Stacks))
         tPtr = Pointer(size: commonSize * 2, increment: 2 * 2)  // m_TexCoordsData
         vPtr = Pointer(size: commonSize * 2, increment: 2 * 3)  // m_VertexData
-        nPtr = Pointer(size: commonSize * 2, increment: 2 * 3)  // m_NormalData
-
+#else
+        let commonSize = Int((m_Slices*2+2) * m_Stacks)
+        vPtr = Pointer3(size: commonSize)
+        tPtr = Pointer2(size: commonSize)
+#endif
         // Vertices
         // Latitude
 
@@ -79,6 +144,7 @@ final class Sphere: NSObject {
             m_TextureInfo = loadTexture(fromBundle: textureFile)
         }
 
+#if false
         for phiIdx in 0..<Int(m_Stacks) {
             //starts at -pi/2 goes to pi/2
             //the first circle
@@ -104,12 +170,7 @@ final class Sphere: NSObject {
                 vPtr[3] = m_Scale * cosPhi1 * cosTheta
                 vPtr[4] = m_Scale * sinPhi1
                 vPtr[5] = m_Scale * (cosPhi1 * sinTheta)
-                nPtr[0] = cosPhi0 * cosTheta
-                nPtr[1] = sinPhi0
-                nPtr[2] = cosPhi0 * sinTheta
-                nPtr[3] = cosPhi1 * cosTheta
-                nPtr[4] = sinPhi1
-                nPtr[5] = cosPhi1 * sinTheta
+print("WTF:", vPtr[2], vPtr[5])
                 do {
                     let texX = GLfloat(thetaIdx) * (1.0 / GLfloat(m_Slices - 1))
                     tPtr[0] = 1.0 - GLfloat(texX)
@@ -118,7 +179,6 @@ final class Sphere: NSObject {
                     tPtr[3] = Float(phiIdx + 1) * (1.0 / GLfloat(m_Stacks))
                 }
                 vPtr.advance()
-                nPtr.advance()
                 tPtr.advance()
             }
             //Degenerate triangle to connect stacks and maintain winding order
@@ -128,19 +188,96 @@ final class Sphere: NSObject {
             vPtr[1] = vPtr[4]
             vPtr[5] = vPtr[-1]
             vPtr[2] = vPtr[5]
-            nPtr[3] = nPtr[-3]
-            nPtr[0] = nPtr[3]
-            nPtr[4] = nPtr[-2]
-            nPtr[1] = nPtr[4]
-            nPtr[5] = nPtr[-1]
-            nPtr[2] = nPtr[5]
 
             tPtr[2] = tPtr[-2]
             tPtr[0] = tPtr[2]
             tPtr[3] = tPtr[-1]
             tPtr[1] = tPtr[3]
+
+            vPtr.advance()
+            tPtr.advance()
         }
-        //super.init()
+        print("OFFSETS:", vPtr.offset, tPtr.offset)
+        vPtr.reset()
+        tPtr.reset()
+
+        func printAll(
+            rows: Int,
+            vPtr: Pointer,
+            tPtr: Pointer
+        ) {
+
+            var s = ""
+            s += "---TYPE:              Vector                Coords\n"
+
+            for row in 0..<rows {
+                s += String(format: "[%.2d] %10.4lf %10.4lf %10.4lf    %10.4lf %10.4lf \n", row, vPtr[row*3], vPtr[row*3+1], vPtr[row*3+2], tPtr[row*2], tPtr[row*2+1])
+            }
+            print("\n\(s)\n")
+        }
+        printAll(rows: Int((m_Slices*2+2) * m_Stacks), vPtr: vPtr, tPtr: tPtr)
+
+#else
+        // Vertices
+        // Latitude
+        var index = 0
+        for phiIdx in 0..<Int(m_Stacks) {
+            //starts at -pi/2 goes to pi/2
+            //the first circle
+            let phi0 = Float(.pi * (Float(phiIdx + 0) * (1.0 / Float(m_Stacks)) - 0.5))
+            //second one
+            let phi1 = Float(.pi * (Float(phiIdx + 1) * (1.0 / Float(m_Stacks)) - 0.5))
+            let cosPhi0 = Float(cos(phi0))
+            let sinPhi0 = Float(sin(phi0))
+            let cosPhi1 = Float(cos(phi1))
+            let sinPhi1 = Float(sin(phi1))
+
+            //longitude
+            for thetaIdx in 0..<Int(m_Slices) {
+
+                let theta: Float = -2.0 * .pi * (Float(thetaIdx)) * (1.0 / Float(m_Slices - 1))
+                let cosTheta: Float = cos(theta + .pi * 0.5)
+                let sinTheta: Float = sin(theta + .pi * 0.5)
+
+                //get x-y-x of the first vertex of stack
+                vPtr[index] = SIMD3<Float>(cosPhi0 * cosTheta, sinPhi0, (cosPhi0 * sinTheta)) * Float(m_Scale)
+                //the same but for the vertex immediately above the previous one.
+                let texX = Float(thetaIdx) * (1.0 / Float(m_Slices - 1))
+                tPtr[index] = SIMD2<Float>(1.0 - Float(texX), Float(phiIdx + 0) * (1.0 / Float(m_Stacks)))
+                index += 1
+
+                vPtr[index] = SIMD3<Float>(cosPhi1 * cosTheta, sinPhi1, (cosPhi1 * sinTheta)) * Float(m_Scale)
+                tPtr[index] = SIMD2<Float>(1.0 - Float(texX), Float(phiIdx + 1) * (1.0 / Float(m_Stacks)))
+                index += 1
+            }
+
+            // Degenerate triangle to connect stacks and maintain winding order
+            let lastVector = vPtr[index - 1]
+            let lastTexCord = tPtr[index - 1]
+            for _ in 0..<2 {
+                vPtr[index] = lastVector
+                tPtr[index] = lastTexCord
+                index += 1
+            }
+        }
+        func printAll(
+            rows: Int,
+            vPtr: Pointer3,
+            tPtr: Pointer2
+        ) {
+            var s = ""
+            s += "---TYPE:              Vector                Coords\n"
+
+            for row in 0..<rows {
+                let v = vPtr[row]
+                let t = tPtr[row]
+
+                s += String(format: "[%.2d] %10.4lf %10.4lf %10.4lf    %10.4lf %10.4lf \n", row, v[0], v[1], v[2], t[0], t[1])
+            }
+            print("\n\(s)\n")
+        }
+        //printAll(rows: Int((m_Slices*2+2) * m_Stacks), vPtr: vPtr, tPtr: tPtr)
+#endif
     }
 
     deinit {
@@ -150,7 +287,7 @@ final class Sphere: NSObject {
     }
 
     func execute() -> Bool {
-        glEnableClientState(UInt32(GL_NORMAL_ARRAY))
+//        glEnableClientState(UInt32(GL_NORMAL_ARRAY))
         glEnableClientState(UInt32(GL_VERTEX_ARRAY))
 
         do {
@@ -166,14 +303,18 @@ final class Sphere: NSObject {
         vPtr.usingRawPointer(block: { (ptr) in
             glVertexPointer(3, UInt32(GL_FLOAT), 0, ptr)
         })
-        nPtr.usingRawPointer(block: { (ptr) in
-            glNormalPointer(UInt32(GL_FLOAT), 0, ptr)
-        })
-        glDrawArrays(UInt32(GL_TRIANGLE_STRIP), 0, (m_Slices+1) * 2 * (m_Stacks-1)+2)
+//        nPtr.usingRawPointer(block: { (ptr) in
+//            glNormalPointer(UInt32(GL_FLOAT), 0, ptr)
+//        })
+
+        //let count = (m_Slices+1) * 2 * (m_Stacks-1)+2
+        let count = Int32(((m_Slices*2+2) * m_Stacks))
+//print("COUNT:", count, "CM:", commonSize)
+        glDrawArrays(UInt32(GL_TRIANGLE_STRIP), 0, count)
         glDisableClientState(UInt32(GL_TEXTURE_COORD_ARRAY))
         glDisable(UInt32(UInt32(GL_TEXTURE_2D)))
         glDisableClientState(UInt32(GL_VERTEX_ARRAY))
-        glDisableClientState(UInt32(GL_NORMAL_ARRAY))
+//        glDisableClientState(UInt32(GL_NORMAL_ARRAY))
         return true
     }
 
