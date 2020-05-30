@@ -385,7 +385,7 @@ final class PanoramaView: GLKView {
         glMaterialfv(UInt32(GL_FRONT_AND_BACK), UInt32(GL_EMISSION), Self.renderSceneWhiteColor) // panorama at full color
         let _ = sphere.execute()
         glMaterialfv(UInt32(GL_FRONT_AND_BACK), UInt32(GL_EMISSION), Self.renderSceneClearColor)
-        //        [meridians execute];  // semi-transparent texture overlay (15° meridian lines)
+        let _ = meridians.execute()  // semi-transparent texture overlay (15° meridian lines)
 
         //TODO: add any objects here to make them a part of the virtual reality
         //        glPushMatrix();
