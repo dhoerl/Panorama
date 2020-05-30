@@ -1,12 +1,17 @@
 # 360° spherical panorama view
 
-## D Hoerl Notes April 26 2020
+## D Hoerl Notes May 30 2020
+
+Updated the mapping routine to use vectors as opposed to an array of floats.
+
+Older:
 
 Stage 1: The Panorama.m Objective C class was split into two classes, Panorama and Sphere. Both were onverted to Swift, and everything appears to work OK. Complete.
 
 Stage2: Apple deprecated OpenGL, so swith from it to using Metal. In Progress...
 
 See Panorama-Prefix.pch for instructions on switching between ObjectiveC and Swift
+
 
 ## Features
 

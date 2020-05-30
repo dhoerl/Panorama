@@ -16,31 +16,6 @@ private let IMAGE_SCALING = GLint(GL_LINEAR)
 
 private typealias WithRawPtr = (UnsafeRawPointer) -> Void
 
-private struct Pointer {
-    private var array: Array<GLfloat>
-    private(set) var offset: Int = 0
-    private let increment: Int
-
-    init(size: Int, increment: Int) {
-        array = Array<GLfloat>(repeating: 0, count: size)
-        self.increment = increment
-    }
-
-    subscript(index: Int) -> GLfloat {
-        get { return array[offset + index] }
-        set(newValue) { array[offset + index] = newValue }
-    }
-
-    mutating func advance() { offset += increment }
-    mutating func reset() { offset = 0 }
-
-    mutating func usingRawPointer(block: WithRawPtr) {
-        array.withUnsafeBytes { (bufPtr) -> Void in
-            block(bufPtr.baseAddress!)
-        }
-    }
-}
-
 private struct Pointer2 {
     private var array: [SIMD2<Float>]
 
@@ -104,13 +79,8 @@ final class Sphere: NSObject {
     //  by Mike Smithwick Jan 2011 pg. 78
     private var m_TextureInfo: GLKTextureInfo?
 
-#if false
-    private var tPtr: Pointer   // m_TexCoordsData
-    private var vPtr: Pointer   // m_VertexData
-#else
     private var tPtr: Pointer2   // m_TexCoordsData
     private var vPtr: Pointer3   // m_VertexData
-#endif
 
     private let m_Stacks: GLint
     private let m_Slices: GLint
@@ -125,18 +95,9 @@ final class Sphere: NSObject {
         m_Stacks = stacks
         m_Slices = slices
 
-#if false
-        let sizeOfGLfloat = GLint(MemoryLayout<GLfloat>.size)
-        let commonSize = Int(sizeOfGLfloat * ((m_Slices*2+2) * m_Stacks))
-        tPtr = Pointer(size: commonSize * 2, increment: 2 * 2)  // m_TexCoordsData
-        vPtr = Pointer(size: commonSize * 2, increment: 2 * 3)  // m_VertexData
-#else
         let commonSize = Int((m_Slices*2+2) * m_Stacks)
         vPtr = Pointer3(size: commonSize)
         tPtr = Pointer2(size: commonSize)
-#endif
-        // Vertices
-        // Latitude
 
         super.init()
 
@@ -144,80 +105,6 @@ final class Sphere: NSObject {
             m_TextureInfo = loadTexture(fromBundle: textureFile)
         }
 
-#if false
-        for phiIdx in 0..<Int(m_Stacks) {
-            //starts at -pi/2 goes to pi/2
-            //the first circle
-            let phi0 = GLfloat(.pi * (GLfloat(phiIdx + 0) * (1.0 / GLfloat(m_Stacks)) - 0.5))
-            //second one
-            let phi1 = GLfloat(.pi * (GLfloat(phiIdx + 1) * (1.0 / GLfloat(m_Stacks)) - 0.5))
-            let cosPhi0 = GLfloat(cos(phi0))
-            let sinPhi0 = GLfloat(sin(phi0))
-            let cosPhi1 = GLfloat(cos(phi1))
-            let sinPhi1 = GLfloat(sin(phi1))
-
-            //longitude
-            for thetaIdx in 0..<Int(m_Slices) {
-                let theta: GLfloat = -2.0 * .pi * (GLfloat(thetaIdx)) * (1.0 / GLfloat(m_Slices - 1))
-                let cosTheta: GLfloat = cos(theta + .pi * 0.5)
-                let sinTheta: GLfloat = sin(theta + .pi * 0.5)
-
-                //get x-y-x of the first vertex of stack
-                vPtr[0] = m_Scale * cosPhi0 * cosTheta
-                vPtr[1] = m_Scale * sinPhi0
-                vPtr[2] = m_Scale * (cosPhi0 * sinTheta)
-                //the same but for the vertex immediately above the previous one.
-                vPtr[3] = m_Scale * cosPhi1 * cosTheta
-                vPtr[4] = m_Scale * sinPhi1
-                vPtr[5] = m_Scale * (cosPhi1 * sinTheta)
-print("WTF:", vPtr[2], vPtr[5])
-                do {
-                    let texX = GLfloat(thetaIdx) * (1.0 / GLfloat(m_Slices - 1))
-                    tPtr[0] = 1.0 - GLfloat(texX)
-                    tPtr[1] = Float(phiIdx + 0) * (1.0 / GLfloat(m_Stacks))
-                    tPtr[2] = 1.0 - GLfloat(texX)
-                    tPtr[3] = Float(phiIdx + 1) * (1.0 / GLfloat(m_Stacks))
-                }
-                vPtr.advance()
-                tPtr.advance()
-            }
-            //Degenerate triangle to connect stacks and maintain winding order
-            vPtr[3] = vPtr[-3]
-            vPtr[0] = vPtr[3]
-            vPtr[4] = vPtr[-2]
-            vPtr[1] = vPtr[4]
-            vPtr[5] = vPtr[-1]
-            vPtr[2] = vPtr[5]
-
-            tPtr[2] = tPtr[-2]
-            tPtr[0] = tPtr[2]
-            tPtr[3] = tPtr[-1]
-            tPtr[1] = tPtr[3]
-
-            vPtr.advance()
-            tPtr.advance()
-        }
-        print("OFFSETS:", vPtr.offset, tPtr.offset)
-        vPtr.reset()
-        tPtr.reset()
-
-        func printAll(
-            rows: Int,
-            vPtr: Pointer,
-            tPtr: Pointer
-        ) {
-
-            var s = ""
-            s += "---TYPE:              Vector                Coords\n"
-
-            for row in 0..<rows {
-                s += String(format: "[%.2d] %10.4lf %10.4lf %10.4lf    %10.4lf %10.4lf \n", row, vPtr[row*3], vPtr[row*3+1], vPtr[row*3+2], tPtr[row*2], tPtr[row*2+1])
-            }
-            print("\n\(s)\n")
-        }
-        printAll(rows: Int((m_Slices*2+2) * m_Stacks), vPtr: vPtr, tPtr: tPtr)
-
-#else
         // Vertices
         // Latitude
         var index = 0
@@ -260,24 +147,23 @@ print("WTF:", vPtr[2], vPtr[5])
                 index += 1
             }
         }
-        func printAll(
-            rows: Int,
-            vPtr: Pointer3,
-            tPtr: Pointer2
-        ) {
-            var s = ""
-            s += "---TYPE:              Vector                Coords\n"
-
-            for row in 0..<rows {
-                let v = vPtr[row]
-                let t = tPtr[row]
-
-                s += String(format: "[%.2d] %10.4lf %10.4lf %10.4lf    %10.4lf %10.4lf \n", row, v[0], v[1], v[2], t[0], t[1])
-            }
-            print("\n\(s)\n")
-        }
+//        func printAll(
+//            rows: Int,
+//            vPtr: Pointer3,
+//            tPtr: Pointer2
+//        ) {
+//            var s = ""
+//            s += "---TYPE:              Vector                Coords\n"
+//
+//            for row in 0..<rows {
+//                let v = vPtr[row]
+//                let t = tPtr[row]
+//
+//                s += String(format: "[%.2d] %10.4lf %10.4lf %10.4lf    %10.4lf %10.4lf \n", row, v[0], v[1], v[2], t[0], t[1])
+//            }
+//            print("\n\(s)\n")
+//        }
         //printAll(rows: Int((m_Slices*2+2) * m_Stacks), vPtr: vPtr, tPtr: tPtr)
-#endif
     }
 
     deinit {
