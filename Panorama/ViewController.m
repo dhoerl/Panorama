@@ -20,7 +20,7 @@
 - (void)viewDidLoad{
 	[super viewDidLoad];
 
-	panoramaView = [PanoramaView new];
+	panoramaView = [[PanoramaView alloc] initWithFrame:self.view.frame];
 	[panoramaView setImageWithName:@"park_2048.jpg"];
 	[panoramaView setOrientToDevice:YES];
 
@@ -32,11 +32,13 @@
 	panoramaView.VRMode = NO;
 
 	[self setView:panoramaView];
+
+    //[self.view addSubview:panoramaView];
 }
 
--(void) glkView:(GLKView *)view drawInRect:(CGRect)rect{
-	[panoramaView draw];
-}
+//-(void) glkView:(GLKView *)view drawInRect:(CGRect)rect{
+//	[panoramaView draw];
+//}
 
 // uncomment everything below to make a VR-Mode switching button
 

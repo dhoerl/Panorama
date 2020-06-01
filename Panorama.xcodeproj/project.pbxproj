@@ -33,6 +33,8 @@
 		D5FAE0B117C895AB00AE6EC9 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5FAE0B017C895AB00AE6EC9 /* CoreMotion.framework */; };
 		D5FAE0B317C895B200AE6EC9 /* GLKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5FAE0B217C895B200AE6EC9 /* GLKit.framework */; };
 		D5FAE0B517C895BE00AE6EC9 /* OpenGLES.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5FAE0B417C895BE00AE6EC9 /* OpenGLES.framework */; };
+		DE8094522473223900C65429 /* ImageSampler.metal in Sources */ = {isa = PBXBuildFile; fileRef = DE8094512473223900C65429 /* ImageSampler.metal */; };
+		DE8350542484020B00271A92 /* RenderEncoder.metal in Sources */ = {isa = PBXBuildFile; fileRef = DE8350532484020B00271A92 /* RenderEncoder.metal */; };
 		DEDAD8192456056C00431DCA /* PanoramaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE75AF9E2443B00E004F856D /* PanoramaView.swift */; };
 		DEDAD81A2456058000431DCA /* Sphere.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE17D7092443B6FF004F8B97 /* Sphere.swift */; };
 /* End PBXBuildFile section */
@@ -88,7 +90,9 @@
 		DE17D7092443B6FF004F8B97 /* Sphere.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sphere.swift; sourceTree = "<group>"; };
 		DE75AF9D2443B00E004F856D /* Panorama-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Panorama-Bridging-Header.h"; sourceTree = "<group>"; };
 		DE75AF9E2443B00E004F856D /* PanoramaView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PanoramaView.swift; sourceTree = "<group>"; };
+		DE8094512473223900C65429 /* ImageSampler.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = ImageSampler.metal; sourceTree = "<group>"; };
 		DE8350512482A34400271A92 /* readme.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = readme.md; sourceTree = "<group>"; };
+		DE8350532484020B00271A92 /* RenderEncoder.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = RenderEncoder.metal; sourceTree = "<group>"; };
 		DEDAD7D52454871300431DCA /* Sphere.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Sphere.m; sourceTree = "<group>"; };
 		DEDAD7D62454C0D900431DCA /* Sphere.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Sphere.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -121,15 +125,16 @@
 		D55E8F931828D2360076A9D7 /* Panorama */ = {
 			isa = PBXGroup;
 			children = (
+				DE809450247321BE00C65429 /* Metal */,
 				D55E8F941828D2360076A9D7 /* AppDelegate.h */,
 				D55E8F951828D2360076A9D7 /* AppDelegate.m */,
 				D55E8FB01828D2360076A9D7 /* ViewController.h */,
 				D55E8FB11828D2360076A9D7 /* ViewController.m */,
 				D55E8FA81828D2360076A9D7 /* PanoramaView.h */,
 				D55E8FA91828D2360076A9D7 /* PanoramaView.m */,
+				DE75AF9E2443B00E004F856D /* PanoramaView.swift */,
 				DEDAD7D62454C0D900431DCA /* Sphere.h */,
 				DEDAD7D52454871300431DCA /* Sphere.m */,
-				DE75AF9E2443B00E004F856D /* PanoramaView.swift */,
 				DE17D7092443B6FF004F8B97 /* Sphere.swift */,
 				D55E8FD11828D3400076A9D7 /* images */,
 				D55E8FD21828D3790076A9D7 /* Supporting Files */,
@@ -221,6 +226,15 @@
 				D5FAE09A17C8956600AE6EC9 /* XCTest.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		DE809450247321BE00C65429 /* Metal */ = {
+			isa = PBXGroup;
+			children = (
+				DE8094512473223900C65429 /* ImageSampler.metal */,
+				DE8350532484020B00271A92 /* RenderEncoder.metal */,
+			);
+			name = Metal;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -337,7 +351,9 @@
 			files = (
 				D55E8FB21828D2360076A9D7 /* AppDelegate.m in Sources */,
 				D55E8FC61828D2360076A9D7 /* ViewController.m in Sources */,
+				DE8094522473223900C65429 /* ImageSampler.metal in Sources */,
 				DEDAD81A2456058000431DCA /* Sphere.swift in Sources */,
+				DE8350542484020B00271A92 /* RenderEncoder.metal in Sources */,
 				DEDAD8192456056C00431DCA /* PanoramaView.swift in Sources */,
 				D55E8FC01828D2360076A9D7 /* main.m in Sources */,
 			);
@@ -492,7 +508,7 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Panorama/Panorama-Prefix.pch";
 				INFOPLIST_FILE = "Panorama/Panorama-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.5;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.robbykraft.${PRODUCT_NAME:rfc1034identifier}";
 				PRODUCT_NAME = Panorama;
@@ -516,7 +532,7 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Panorama/Panorama-Prefix.pch";
 				INFOPLIST_FILE = "Panorama/Panorama-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 13.5;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.robbykraft.${PRODUCT_NAME:rfc1034identifier}";
 				PRODUCT_NAME = Panorama;

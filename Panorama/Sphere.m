@@ -27,9 +27,9 @@
 
 @implementation Sphere
 {
-	//  from Touch Fighter by Apple
-	//  in Pro OpenGL ES for iOS
-	//  by Mike Smithwick Jan 2011 pg. 78
+//  from Touch Fighter by Apple
+//  in Pro OpenGL ES for iOS
+//  by Mike Smithwick Jan 2011 pg. 78
 	GLKTextureInfo *m_TextureInfo;
 	GLfloat *m_TexCoordsData;
 	GLfloat *m_VertexData;
