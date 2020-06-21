@@ -2,9 +2,10 @@
 //  PanoramaView.swift
 //  Panorama
 //
-//  Created by Robby Kraft on 8/24/2013.
+//  Originally Created by Robby Kraft on 8/24/2013.
 //  Swift Conversion by David Hoerl 4/25/2020
 //  Copyright (c) 2013 Robby Kraft. All rights reserved.
+//  Copyright (c) 2020 David Hoerl. All rights reserved.
 //
 //  Remark: a dynamic GLKView with a touch and motion sensor interface to align and immerse the perspective inside an equirectangular panorama projection
 //  Converted to Swift 5.2 by Swiftify v5.2.18740 - https://swiftify.com/
@@ -18,12 +19,6 @@ import CoreMotion
 @objc
 final class PanoramaView: MTKView {
 
-    //@objc var view: MTKView { metalView }
-    //private lazy var mtlDevice: MTLDevice = MTLCreateSystemDefaultDevice()!
-    //private var commandQueue: MTLCommandQueue!
-    //private var vertexBuffer: MTLBuffer!
-
-    //private var indicesBuffer: MTLBuffer
     private var metalCommandQueue: MTLCommandQueue
     private lazy var pipelineRenderState: MTLRenderPipelineState = { self.makePipelineState() }()
     private let threadGroupCount = MTLSizeMake(8, 8, 1)
@@ -31,8 +26,6 @@ final class PanoramaView: MTKView {
 
     //private var library:MTLLibrary!
     private var function: MTLFunction!
-
-   // var Indices: [UInt32] = [0, 1, 2, 2, 3, 0]
 
     private var rotation: Float = 0.0
     private var ebo = GLuint()
@@ -63,8 +56,12 @@ final class PanoramaView: MTKView {
 
     private var SENSOR_ORIENTATION: UIInterfaceOrientation { UIApplication.shared.statusBarOrientation }
     private lazy var motionManager: CMMotionManager = CMMotionManager()
-    private lazy var sphere: Sphere = Sphere(48, slices: 48, radius: 10.0, textureFile: "park_2048.jpg", device: self.device!)
-    private lazy var meridians: Sphere = Sphere(48, slices: 48, radius: 8.0, textureFile: "equirectangular-projection-lines.png", device: self.device!)
+
+    private lazy var _sphere: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "park_2048.jpg", device: self.device!)
+    private lazy var _meridians: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "equirectangular-projection-lines.png", device: self.device!)
+private lazy var xxx: Sphere = _sphere
+#warning("ADD FILTER MODE")
+
     private lazy var pinchGesture: UIPinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinchHandler(_:)))
     private lazy var panGesture: UIPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(panHandler(_:)))
     private var projectionMatrix: GLKMatrix4 = GLKMatrix4Identity
@@ -135,54 +132,17 @@ print("INIT Frame:", frameRect)
 
     private func makeVertexBuffer() -> MTLBuffer {
         guard let device = self.device else { fatalError() }
-#if true
-        vertexCount = meridians.commonSize
+        vertexCount = xxx.commonSize
         // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let vertexBuffer = device.makeBuffer(bytes: meridians.vPtr, length: vertexCount * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
-#else
-
-        let kCntQuadVertices = 6
-        let kSzQuadVertices  = kCntQuadVertices * MemoryLayout<SIMD4<Float>>.stride
-        vertexCount = 6
-        var kQuadVertices: [SIMD4<Float>] = [
-            SIMD4<Float>(-1.0, -1.0, 0.0, 1.0),
-            SIMD4<Float>(1.0, -1.0, 0.0, 1.0),
-            SIMD4<Float>(-1.0, 1.0, 0.0, 1.0),
-            SIMD4<Float>(1.0, -1.0, 0.0, 1.0),
-            SIMD4<Float>(-1.0, 1.0, 0.0, 1.0),
-            SIMD4<Float>(1.0, 1.0, 0.0, 1.0)
-        ]
-        vertexBuffer = device.makeBuffer(
-            bytes: &kQuadVertices,
-            length: Int(kSzQuadVertices),
-            options: .cpuCacheModeWriteCombined)!
-#endif
+        let vertexBuffer = device.makeBuffer(bytes: xxx.vPtr, length: vertexCount * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
         return vertexBuffer
     }
 
     private func makeTexCoordBuffer() -> MTLBuffer {
        guard let device = self.device else { fatalError() }
-#if true
-        vertexCount = meridians.commonSize
+        vertexCount = xxx.commonSize
         // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let texCoordBuffer = device.makeBuffer(bytes: meridians.tPtr, length: vertexCount * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
-#else
-        let kCntQuadTexCoords = 6
-        let kSzQuadTexCoords = kCntQuadTexCoords * MemoryLayout<SIMD2<Float>>.stride
-         var kQuadTexCoords: [SIMD2<Float>] = [
-            SIMD2<Float>(0.0, 0.0),
-            SIMD2<Float>(1.0, 0.0),
-            SIMD2<Float>(0.0, 1.0),
-            SIMD2<Float>(1.0, 0.0),
-            SIMD2<Float>(0.0, 1.0),
-            SIMD2<Float>(1.0, 1.0)
-        ]
-        texCoordBuffer = device.makeBuffer(
-            bytes: &kQuadTexCoords,
-            length: Int(kSzQuadTexCoords),
-            options: .cpuCacheModeWriteCombined)!
-
-#endif
+        let texCoordBuffer = device.makeBuffer(bytes: xxx.tPtr, length: vertexCount * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
         return texCoordBuffer
     }
 
@@ -235,33 +195,36 @@ assert(self.currentDrawable != nil)
         let commandBuffer = metalCommandQueue.makeCommandBuffer()!
 
         let renderPassDescriptor = self.currentRenderPassDescriptor!
-        let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
-        renderEncoder.setRenderPipelineState(pipelineRenderState)
+do {
+    let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
+    renderEncoder.setRenderPipelineState(pipelineRenderState)
+    renderEncoder.setFrontFacing(.counterClockwise)
 
-        renderEncoder.setVertexBuffer(
-            vertexBuffer,
-            offset: 0,
-            index: 0)
+    renderEncoder.setVertexBuffer(
+        vertexBuffer,
+        offset: 0,
+        index: 0)
 
-        renderEncoder.setVertexBuffer(
-            texCoordBuffer,
-            offset: 0,
-            index: 1)
+    renderEncoder.setVertexBuffer(
+        texCoordBuffer,
+        offset: 0,
+        index: 1)
 
-        renderEncoder.setFragmentTexture(
-            meridians.m_Texture,
-            index: 0)
+    renderEncoder.setFragmentTexture(
+        xxx.m_Texture,
+        index: 0)
 
-        // tell the render context we want to draw our primitives. We will draw triangles that's
-        // why we need kQuadVertices and kQuadTexCoords (arrays of points)
-        renderEncoder.drawPrimitives(
-            type: .triangle,
-            vertexStart: 0,
-            vertexCount: vertexCount,
-            instanceCount: 1)
+    // tell the render context we want to draw our primitives. We will draw triangles that's
+    // why we need kQuadVertices and kQuadTexCoords (arrays of points)
+    renderEncoder.drawPrimitives(
+        type: .triangleStrip,
+        vertexStart: 0,
+        vertexCount: vertexCount,
+        instanceCount: 1)
 
-        renderEncoder.endEncoding()
-        commandBuffer.present(self.currentDrawable!)
+    renderEncoder.endEncoding()
+}
+commandBuffer.present(self.currentDrawable!)
 
         commandBuffer.commit()
     }
@@ -304,7 +267,7 @@ assert(self.currentDrawable != nil)
         }
         set(imageWithName) {
             _imageWithName = imageWithName
-            sphere.swapTexture(imageWithName)
+            xxx.swapTexture(imageWithName)
         }
     }
     /// set image
@@ -315,7 +278,7 @@ assert(self.currentDrawable != nil)
         }
         set(image) {
             _image = image
-            sphere.swapTexture(image: image)
+            xxx.swapTexture(image: image)
         }
     }
     /// Enables UIPanGestureRecognizer to affect view orientation
@@ -385,7 +348,7 @@ assert(self.currentDrawable != nil)
         if pxl.x < 0.0 {
             pxl.x += 1.0
         }
-        let tex = sphere.getTextureSize()
+        let tex = xxx.getTextureSize()
         if tex != CGSize.zero {
             // if no texture exists, returns between 0.0 - 1.0
             if !(tex.width == 0.0 && tex.height == 0.0) {

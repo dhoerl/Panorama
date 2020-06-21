@@ -2,8 +2,7 @@
 //  RenderEncoder.metal
 //  Panorama
 //
-//  Created by David Hoerl on 5/23/20.
-//  Copyright © 2020 Self. All rights reserved.
+//  Copyright © 2020 David Hoerl . All rights reserved.
 //
 
 #include <metal_stdlib>
