@@ -35,9 +35,13 @@ final class PanoramaView: MTKView {
     //private var sceneMatrices = SceneMatrices()
     //private var uniformBuffer: MTLBuffer = MTLBuffer()
 
-    private lazy var vertexBuffer: MTLBuffer = { return self.makeVertexBuffer() }()
-    private lazy var texCoordBuffer: MTLBuffer  = { return self.makeTexCoordBuffer() }()
-    private var vertexCount = 0
+    private lazy var vertexBufferSphere: MTLBuffer = { return self.makeVertexBufferSphere() }()
+    private lazy var texCoordBufferSphere: MTLBuffer  = { return self.makeTexCoordBufferSphere() }()
+    private var vertexCountSphere = 0
+
+    private lazy var vertexBufferMeridians: MTLBuffer = { return self.makeVertexBufferMeridians() }()
+    private lazy var texCoordBufferMeridians: MTLBuffer  = { return self.makeTexCoordBufferMeridians() }()
+    private var vertexCountMeridians = 0
 
     private var lastUpdateDate = Date()
 
@@ -57,9 +61,9 @@ final class PanoramaView: MTKView {
     private var SENSOR_ORIENTATION: UIInterfaceOrientation { UIApplication.shared.statusBarOrientation }
     private lazy var motionManager: CMMotionManager = CMMotionManager()
 
-    private lazy var _sphere: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "park_2048.jpg", device: self.device!)
-    private lazy var _meridians: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "equirectangular-projection-lines.png", device: self.device!)
-private lazy var xxx: Sphere = _sphere
+    private lazy var sphere: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "park_2048.jpg", device: self.device!)
+    private lazy var meridians: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "equirectangular-projection-lines.png", device: self.device!)
+//private lazy var xxx: Sphere = _sphere
 #warning("ADD FILTER MODE")
 
     private lazy var pinchGesture: UIPinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinchHandler(_:)))
@@ -130,19 +134,33 @@ print("INIT Frame:", frameRect)
     }
 
 
-    private func makeVertexBuffer() -> MTLBuffer {
+    private func makeVertexBufferSphere() -> MTLBuffer {
         guard let device = self.device else { fatalError() }
-        vertexCount = xxx.commonSize
+        vertexCountSphere = sphere.commonSize
         // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let vertexBuffer = device.makeBuffer(bytes: xxx.vPtr, length: vertexCount * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
+        let vertexBuffer = device.makeBuffer(bytes: sphere.vPtr, length: vertexCountSphere * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
+        return vertexBuffer
+    }
+    private func makeVertexBufferMeridians() -> MTLBuffer {
+        guard let device = self.device else { fatalError() }
+        vertexCountMeridians = meridians.commonSize
+        // cpuCacheModeWriteCombined -> CPU writes but never reads
+        let vertexBuffer = device.makeBuffer(bytes: meridians.vPtr, length: vertexCountSphere * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
         return vertexBuffer
     }
 
-    private func makeTexCoordBuffer() -> MTLBuffer {
+    private func makeTexCoordBufferSphere() -> MTLBuffer {
        guard let device = self.device else { fatalError() }
-        vertexCount = xxx.commonSize
+        vertexCountSphere = sphere.commonSize
         // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let texCoordBuffer = device.makeBuffer(bytes: xxx.tPtr, length: vertexCount * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
+        let texCoordBuffer = device.makeBuffer(bytes: sphere.tPtr, length: vertexCountSphere * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
+        return texCoordBuffer
+    }
+    private func makeTexCoordBufferMeridians() -> MTLBuffer {
+       guard let device = self.device else { fatalError() }
+        vertexCountSphere = meridians.commonSize
+        // cpuCacheModeWriteCombined -> CPU writes but never reads
+        let texCoordBuffer = device.makeBuffer(bytes: meridians.tPtr, length: vertexCountSphere * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
         return texCoordBuffer
     }
 
@@ -196,22 +214,24 @@ assert(self.currentDrawable != nil)
 
         let renderPassDescriptor = self.currentRenderPassDescriptor!
 do {
+    renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)
+
     let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
     renderEncoder.setRenderPipelineState(pipelineRenderState)
     renderEncoder.setFrontFacing(.counterClockwise)
 
     renderEncoder.setVertexBuffer(
-        vertexBuffer,
+        vertexBufferSphere,
         offset: 0,
         index: 0)
 
     renderEncoder.setVertexBuffer(
-        texCoordBuffer,
+        texCoordBufferSphere,
         offset: 0,
         index: 1)
 
     renderEncoder.setFragmentTexture(
-        xxx.m_Texture,
+        sphere.m_Texture,
         index: 0)
 
     // tell the render context we want to draw our primitives. We will draw triangles that's
@@ -219,14 +239,48 @@ do {
     renderEncoder.drawPrimitives(
         type: .triangleStrip,
         vertexStart: 0,
-        vertexCount: vertexCount,
+        vertexCount: vertexCountSphere,
         instanceCount: 1)
 
     renderEncoder.endEncoding()
 }
-commandBuffer.present(self.currentDrawable!)
+if true {
+    let renderPassDescriptionX = renderPassDescriptor
+//    renderPassDescriptionX.colorAttachments[0].texture = multisampleColorTexture
+    renderPassDescriptionX.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 0.0)
+    renderPassDescriptionX.colorAttachments[0].loadAction = .load
+    renderPassDescriptionX.colorAttachments[0].storeAction = .store
 
-        commandBuffer.commit()
+    let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptionX)!
+    renderEncoder.setRenderPipelineState(pipelineRenderState)
+    renderEncoder.setFrontFacing(.counterClockwise)
+    renderEncoder.setVertexBuffer(
+        vertexBufferMeridians,
+        offset: 0,
+        index: 0)
+
+    renderEncoder.setVertexBuffer(
+        texCoordBufferMeridians,
+        offset: 0,
+        index: 1)
+
+    renderEncoder.setFragmentTexture(
+        meridians.m_Texture,
+        index: 0)
+
+    // tell the render context we want to draw our primitives. We will draw triangles that's
+    // why we need kQuadVertices and kQuadTexCoords (arrays of points)
+    renderEncoder.drawPrimitives(
+        type: .triangleStrip,
+        vertexStart: 0,
+        vertexCount: vertexCountMeridians,
+        instanceCount: 1)
+
+    renderEncoder.endEncoding()
+}
+
+commandBuffer.present(self.currentDrawable!)
+commandBuffer.commit()
     }
 
     // MARK: UI Related
@@ -267,7 +321,7 @@ commandBuffer.present(self.currentDrawable!)
         }
         set(imageWithName) {
             _imageWithName = imageWithName
-            xxx.swapTexture(imageWithName)
+            sphere.swapTexture(imageWithName)
         }
     }
     /// set image
@@ -278,7 +332,7 @@ commandBuffer.present(self.currentDrawable!)
         }
         set(image) {
             _image = image
-            xxx.swapTexture(image: image)
+            sphere.swapTexture(image: image)
         }
     }
     /// Enables UIPanGestureRecognizer to affect view orientation
@@ -348,7 +402,7 @@ commandBuffer.present(self.currentDrawable!)
         if pxl.x < 0.0 {
             pxl.x += 1.0
         }
-        let tex = xxx.getTextureSize()
+        let tex = sphere.getTextureSize()
         if tex != CGSize.zero {
             // if no texture exists, returns between 0.0 - 1.0
             if !(tex.width == 0.0 && tex.height == 0.0) {
