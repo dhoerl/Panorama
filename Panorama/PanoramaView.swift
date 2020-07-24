@@ -63,8 +63,6 @@ final class PanoramaView: MTKView {
 
     private lazy var sphere: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "park_2048.jpg", device: self.device!)
     private lazy var meridians: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "equirectangular-projection-lines.png", device: self.device!)
-//private lazy var xxx: Sphere = _sphere
-#warning("ADD FILTER MODE")
 
     private lazy var pinchGesture: UIPinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinchHandler(_:)))
     private lazy var panGesture: UIPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(panHandler(_:)))
@@ -160,7 +158,7 @@ print("INIT Frame:", frameRect)
        guard let device = self.device else { fatalError() }
         vertexCountSphere = meridians.commonSize
         // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let texCoordBuffer = device.makeBuffer(bytes: meridians.tPtr, length: vertexCountSphere * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
+        let texCoordBuffer = device.makeBuffer(bytes: meridians.tPtr, length: vertexCountMeridians * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
         return texCoordBuffer
     }
 
@@ -177,10 +175,23 @@ print("INIT Frame:", frameRect)
             let vertexProgram = library.makeFunction(name: "texturedQuadVertex")
 
             let pQuadPipelineStateDescriptor = MTLRenderPipelineDescriptor()
-            pQuadPipelineStateDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
             pQuadPipelineStateDescriptor.rasterSampleCount = 1
             pQuadPipelineStateDescriptor.vertexFunction = vertexProgram
             pQuadPipelineStateDescriptor.fragmentFunction = fragmentProgram
+
+            do {
+                let renderbufferAttachment: MTLRenderPipelineColorAttachmentDescriptor = pQuadPipelineStateDescriptor.colorAttachments[0]
+                renderbufferAttachment.pixelFormat = .bgra8Unorm
+                renderbufferAttachment.isBlendingEnabled = true
+                renderbufferAttachment.rgbBlendOperation = .add
+                renderbufferAttachment.alphaBlendOperation = .add
+
+                renderbufferAttachment.sourceRGBBlendFactor = .sourceAlpha
+                renderbufferAttachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
+
+                renderbufferAttachment.sourceAlphaBlendFactor = .sourceAlpha
+                renderbufferAttachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
+            }
 
             let pipeline = try device.makeRenderPipelineState(descriptor: pQuadPipelineStateDescriptor)
             return pipeline
@@ -190,7 +201,6 @@ print("INIT Frame:", frameRect)
         }
     }
 
-
     required init(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -198,27 +208,21 @@ print("INIT Frame:", frameRect)
     deinit {
     }
 
-    // MARK: - MTKView Delegate
-
-//    func mtkView(_ metalView: MTKView, drawableSizeWillChange size: CGSize) {
-//    }
-
-    //func draw(in metalView: MTKView) {
     override func draw(_ rect: CGRect) {
 print("DRAW!!!")
 assert(self.device != nil)
 assert(self.currentDrawable != nil)
 
         // Pulling the one-time command buffer from the queue.
-        let commandBuffer = metalCommandQueue.makeCommandBuffer()!
+        guard let commandBuffer = metalCommandQueue.makeCommandBuffer(), let renderPassDescriptor = self.currentRenderPassDescriptor else { return }
 
-        let renderPassDescriptor = self.currentRenderPassDescriptor!
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)
+
         let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
         renderEncoder.setRenderPipelineState(pipelineRenderState)
         renderEncoder.setFrontFacing(.counterClockwise)
 
-        if false {
+        if true {
             renderEncoder.setVertexBuffer(
                 vertexBufferSphere,
                 offset: 0,
@@ -240,16 +244,9 @@ assert(self.currentDrawable != nil)
                 vertexStart: 0,
                 vertexCount: vertexCountSphere,
                 instanceCount: 1)
-        } else {
-//            let renderPassDescriptionX = renderPassDescriptor
-//        //    renderPassDescriptionX.colorAttachments[0].texture = multisampleColorTexture
-//            renderPassDescriptionX.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 0.0)
-//            renderPassDescriptionX.colorAttachments[0].loadAction = .load
-//            renderPassDescriptionX.colorAttachments[0].storeAction = .store
-//
-//            let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptionX)!
-//            renderEncoder.setRenderPipelineState(pipelineRenderState)
-//            renderEncoder.setFrontFacing(.counterClockwise)
+        }
+
+        if true {
             renderEncoder.setVertexBuffer(
                 vertexBufferMeridians,
                 offset: 0,
@@ -271,8 +268,8 @@ assert(self.currentDrawable != nil)
                 vertexStart: 0,
                 vertexCount: vertexCountMeridians,
                 instanceCount: 1)
-
         }
+
         renderEncoder.endEncoding()
 
         commandBuffer.present(self.currentDrawable!)
