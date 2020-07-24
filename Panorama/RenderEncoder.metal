@@ -30,8 +30,11 @@ vertex VertexInOut texturedQuadVertex(constant float4         *pPosition   [[ bu
 fragment half4 texturedQuadFragment(VertexInOut     inFrag    [[ stage_in ]],
                                     texture2d<half>  tex2D     [[ texture(0) ]])
 {
+    constexpr sampler s(coord::normalized, address::repeat, filter::linear);
     constexpr sampler quad_sampler;
-    half4 color = tex2D.sample(quad_sampler, inFrag.m_TexCoord);
+    constexpr sampler textureSampler(mag_filter::linear, min_filter::linear, filter::linear);
+
+    half4 color = tex2D.sample(textureSampler, inFrag.m_TexCoord);
 
     return color;
 }
