@@ -145,7 +145,7 @@ print("INIT Frame:", frameRect)
         guard let device = self.device else { fatalError() }
         vertexCountMeridians = meridians.commonSize
         // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let vertexBuffer = device.makeBuffer(bytes: meridians.vPtr, length: vertexCountSphere * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
+        let vertexBuffer = device.makeBuffer(bytes: meridians.vPtr, length: vertexCountMeridians * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
         return vertexBuffer
     }
 
@@ -213,74 +213,70 @@ assert(self.currentDrawable != nil)
         let commandBuffer = metalCommandQueue.makeCommandBuffer()!
 
         let renderPassDescriptor = self.currentRenderPassDescriptor!
-do {
-    renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)
+        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)
+        let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
+        renderEncoder.setRenderPipelineState(pipelineRenderState)
+        renderEncoder.setFrontFacing(.counterClockwise)
 
-    let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
-    renderEncoder.setRenderPipelineState(pipelineRenderState)
-    renderEncoder.setFrontFacing(.counterClockwise)
+        if false {
+            renderEncoder.setVertexBuffer(
+                vertexBufferSphere,
+                offset: 0,
+                index: 0)
 
-    renderEncoder.setVertexBuffer(
-        vertexBufferSphere,
-        offset: 0,
-        index: 0)
+            renderEncoder.setVertexBuffer(
+                texCoordBufferSphere,
+                offset: 0,
+                index: 1)
 
-    renderEncoder.setVertexBuffer(
-        texCoordBufferSphere,
-        offset: 0,
-        index: 1)
+            renderEncoder.setFragmentTexture(
+                sphere.m_Texture,
+                index: 0)
 
-    renderEncoder.setFragmentTexture(
-        sphere.m_Texture,
-        index: 0)
+            // tell the render context we want to draw our primitives. We will draw triangles that's
+            // why we need kQuadVertices and kQuadTexCoords (arrays of points)
+            renderEncoder.drawPrimitives(
+                type: .triangleStrip,
+                vertexStart: 0,
+                vertexCount: vertexCountSphere,
+                instanceCount: 1)
+        } else {
+//            let renderPassDescriptionX = renderPassDescriptor
+//        //    renderPassDescriptionX.colorAttachments[0].texture = multisampleColorTexture
+//            renderPassDescriptionX.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 0.0)
+//            renderPassDescriptionX.colorAttachments[0].loadAction = .load
+//            renderPassDescriptionX.colorAttachments[0].storeAction = .store
+//
+//            let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptionX)!
+//            renderEncoder.setRenderPipelineState(pipelineRenderState)
+//            renderEncoder.setFrontFacing(.counterClockwise)
+            renderEncoder.setVertexBuffer(
+                vertexBufferMeridians,
+                offset: 0,
+                index: 0)
 
-    // tell the render context we want to draw our primitives. We will draw triangles that's
-    // why we need kQuadVertices and kQuadTexCoords (arrays of points)
-    renderEncoder.drawPrimitives(
-        type: .triangleStrip,
-        vertexStart: 0,
-        vertexCount: vertexCountSphere,
-        instanceCount: 1)
+            renderEncoder.setVertexBuffer(
+                texCoordBufferMeridians,
+                offset: 0,
+                index: 1)
 
-    renderEncoder.endEncoding()
-}
-if true {
-    let renderPassDescriptionX = renderPassDescriptor
-//    renderPassDescriptionX.colorAttachments[0].texture = multisampleColorTexture
-    renderPassDescriptionX.colorAttachments[0].clearColor = MTLClearColor(red: 0.0, green: 1.0, blue: 0.0, alpha: 0.0)
-    renderPassDescriptionX.colorAttachments[0].loadAction = .load
-    renderPassDescriptionX.colorAttachments[0].storeAction = .store
+            renderEncoder.setFragmentTexture(
+                meridians.m_Texture,
+                index: 0)
 
-    let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptionX)!
-    renderEncoder.setRenderPipelineState(pipelineRenderState)
-    renderEncoder.setFrontFacing(.counterClockwise)
-    renderEncoder.setVertexBuffer(
-        vertexBufferMeridians,
-        offset: 0,
-        index: 0)
+            // tell the render context we want to draw our primitives. We will draw triangles that's
+            // why we need kQuadVertices and kQuadTexCoords (arrays of points)
+            renderEncoder.drawPrimitives(
+                type: .triangleStrip,
+                vertexStart: 0,
+                vertexCount: vertexCountMeridians,
+                instanceCount: 1)
 
-    renderEncoder.setVertexBuffer(
-        texCoordBufferMeridians,
-        offset: 0,
-        index: 1)
+        }
+        renderEncoder.endEncoding()
 
-    renderEncoder.setFragmentTexture(
-        meridians.m_Texture,
-        index: 0)
-
-    // tell the render context we want to draw our primitives. We will draw triangles that's
-    // why we need kQuadVertices and kQuadTexCoords (arrays of points)
-    renderEncoder.drawPrimitives(
-        type: .triangleStrip,
-        vertexStart: 0,
-        vertexCount: vertexCountMeridians,
-        instanceCount: 1)
-
-    renderEncoder.endEncoding()
-}
-
-commandBuffer.present(self.currentDrawable!)
-commandBuffer.commit()
+        commandBuffer.present(self.currentDrawable!)
+        commandBuffer.commit()
     }
 
     // MARK: UI Related
