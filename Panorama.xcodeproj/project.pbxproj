@@ -93,6 +93,7 @@
 		DE8094512473223900C65429 /* ImageSampler.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = ImageSampler.metal; sourceTree = "<group>"; };
 		DE8350512482A34400271A92 /* readme.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = readme.md; sourceTree = "<group>"; };
 		DE8350532484020B00271A92 /* RenderEncoder.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = RenderEncoder.metal; sourceTree = "<group>"; };
+		DE92211C24CB6531005BD6B2 /* PanoramaViewORIG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanoramaViewORIG.swift; sourceTree = "<group>"; };
 		DEDAD7D52454871300431DCA /* Sphere.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Sphere.m; sourceTree = "<group>"; };
 		DEDAD7D62454C0D900431DCA /* Sphere.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Sphere.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -133,6 +134,7 @@
 				D55E8FA81828D2360076A9D7 /* PanoramaView.h */,
 				D55E8FA91828D2360076A9D7 /* PanoramaView.m */,
 				DE75AF9E2443B00E004F856D /* PanoramaView.swift */,
+				DE92211C24CB6531005BD6B2 /* PanoramaViewORIG.swift */,
 				DEDAD7D62454C0D900431DCA /* Sphere.h */,
 				DEDAD7D52454871300431DCA /* Sphere.m */,
 				DE17D7092443B6FF004F8B97 /* Sphere.swift */,
@@ -281,7 +283,7 @@
 		D5FAE06D17C8956600AE6EC9 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 1140;
+				LastUpgradeCheck = 1160;
 				ORGANIZATIONNAME = "Robby Kraft";
 				TargetAttributes = {
 					D5FAE07417C8956600AE6EC9 = {
@@ -491,6 +493,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -508,7 +511,7 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Panorama/Panorama-Prefix.pch";
 				INFOPLIST_FILE = "Panorama/Panorama-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 13.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.robbykraft.${PRODUCT_NAME:rfc1034identifier}";
 				PRODUCT_NAME = Panorama;
@@ -532,7 +535,7 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "Panorama/Panorama-Prefix.pch";
 				INFOPLIST_FILE = "Panorama/Panorama-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 13.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.robbykraft.${PRODUCT_NAME:rfc1034identifier}";
 				PRODUCT_NAME = Panorama;

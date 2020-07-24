@@ -2,59 +2,20 @@
 //  PanoramaView.swift
 //  Panorama
 //
-//  Originally Created by Robby Kraft on 8/24/2013.
+//  Created by Robby Kraft on 8/24/2013.
 //  Swift Conversion by David Hoerl 4/25/2020
 //  Copyright (c) 2013 Robby Kraft. All rights reserved.
-//  Copyright (c) 2020 David Hoerl. All rights reserved.
 //
 //  Remark: a dynamic GLKView with a touch and motion sensor interface to align and immerse the perspective inside an equirectangular panorama projection
 //  Converted to Swift 5.2 by Swiftify v5.2.18740 - https://swiftify.com/
 
 import Foundation
-
-import GLKit
-import MetalKit
 import CoreMotion
-
-// Keep in Sync with RednerEncoder.metal
-private struct Uniforms {
-  let projectionMatrix: GLKMatrix4
-  let attitudeMatrix: GLKMatrix4
-  let offsetMatrix: GLKMatrix4
-}
-
+import GLKit
+import OpenGLES
 
 @objc
-final class PanoramaView: MTKView {
-
-    private var metalCommandQueue: MTLCommandQueue
-    private lazy var pipelineRenderState: MTLRenderPipelineState = { self.makePipelineState() }()
-    private let threadGroupCount = MTLSizeMake(8, 8, 1)
-    private var threadGroups: MTLSize!
-    private let uniformBuffer: MTLBuffer
-
-    //private var library:MTLLibrary!
-    private var function: MTLFunction!
-
-    private var rotation: Float = 0.0
-    private var ebo = GLuint()
-    private var vbo = GLuint()
-    private var vao = GLuint()
-
-    //private var sceneMatrices = SceneMatrices()
-    //private var uniformBuffer: MTLBuffer = MTLBuffer()
-
-    private lazy var vertexBufferSphere: MTLBuffer = { return self.makeVertexBufferSphere() }()
-    private lazy var texCoordBufferSphere: MTLBuffer  = { return self.makeTexCoordBufferSphere() }()
-    private var vertexCountSphere = 0
-
-    private lazy var vertexBufferMeridians: MTLBuffer = { return self.makeVertexBufferMeridians() }()
-    private lazy var texCoordBufferMeridians: MTLBuffer  = { return self.makeTexCoordBufferMeridians() }()
-    private var vertexCountMeridians = 0
-
-    private var lastUpdateDate = Date()
-
-    private var counter = 0
+final class PanoramaView: GLKView {
 
     private static let renderSceneWhiteColor: [GLfloat] = [1.0, 1.0, 1.0, 1.0]
     private static let renderSceneClearColor: [GLfloat] = [0.0, 0.0, 0.0, 0.0]
@@ -69,10 +30,8 @@ final class PanoramaView: MTKView {
 
     private var SENSOR_ORIENTATION: UIInterfaceOrientation { UIApplication.shared.statusBarOrientation }
     private lazy var motionManager: CMMotionManager = CMMotionManager()
-
-    private lazy var sphere: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "park_2048.jpg", device: self.device!)
-    private lazy var meridians: Sphere = Sphere(48, slices: 48, radius: 1.0, textureFile: "equirectangular-projection-lines.png", device: self.device!)
-
+    private lazy var sphere: Sphere = Sphere(48, slices: 48, radius: 10.0, textureFile: nil)
+    private lazy var meridians: Sphere = Sphere(48, slices: 48, radius: 8.0, textureFile: "equirectangular-projection-lines.png")
     private lazy var pinchGesture: UIPinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(pinchHandler(_:)))
     private lazy var panGesture: UIPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(panHandler(_:)))
     private var projectionMatrix: GLKMatrix4 = GLKMatrix4Identity
@@ -81,227 +40,6 @@ final class PanoramaView: MTKView {
     private var aspectRatio: Float = 1.0
     private var retinaScale: Float = 0.0
     private var circlePoints = [GLfloat](repeating: 0, count: 64 * 3) // meridian lines
-
-    // MARK: - Inits -
-
-//UIScreen.main.bounds
-    convenience init(frame frameRect: CGRect) {
-print("INIT Frame:", frameRect)
-        self.init(frame: frameRect, device: nil)
-    }
-
-    override init(frame frameRect: CGRect, device nDevice: MTLDevice?) {
-        guard
-            let device = nDevice ?? MTLCreateSystemDefaultDevice(),
-            let metalCommandQueue = device.makeCommandQueue()
-        else { fatalError() }
-        self.metalCommandQueue = metalCommandQueue
-        self.uniformBuffer = device.makeBuffer(length: MemoryLayout<Uniforms>.size, options: [])!
-
-        super.init(frame: frameRect, device: device)
-        self.device = device
-
-
-        if #available(iOS 13.0, *), let metalLayer = self.layer as? CAMetalLayer {
-            assert(metalLayer.device != nil)
-            metalLayer.isOpaque = true
-            //metalLayer.pixelFormat = MTLPixelFormat.bgra8Unorm_srgb // MTLPixelFormatBGRA8Unorm_sRGB
-            metalLayer.framebufferOnly = false
-            metalLayer.backgroundColor = UIColor.red.cgColor
-        } else {
-            self.isOpaque = true
-            //metalView.colorPixelFormat = MTLPixelFormat.bgra8Unorm_srgb // MTLPixelFormatBGRA8Unorm_sRGB
-            self.framebufferOnly = true
-            self.framebufferOnly = false   // false because this app writes to the drawable in the draw method
-            self.backgroundColor = UIColor.red
-        }
-        self.autoResizeDrawable = true
-        self.enableSetNeedsDisplay = true  // if you want to update the view, calls metalView.setNeedsDisplay = true
-        self.autoresizingMask = [] // [.flexibleHeight, .flexibleWidth]
-
-        let frame = self.frame
-        aspectRatio = Float(frame.size.width / frame.size.height)
-        fieldOfView = 45 + 45 * atanf(aspectRatio)
-        retinaScale = Float(UIScreen.main.nativeScale)
-
-        rebuildProjectionMatrix()
-        attitudeMatrix = GLKMatrix4Identity
-        offsetMatrix = GLKMatrix4Identity
-        customGL()
-        makeLatitudeLines()
-
-//        self.delegate = self // 4
-        self.clearColor = MTLClearColorMake(0, 0, 0, 0)
-        self.autoResizeDrawable = true
-
-        pinchGesture.isEnabled = false
-        self.addGestureRecognizer(pinchGesture)
-
-        panGesture.maximumNumberOfTouches = 1
-        panGesture.isEnabled = false
-        self.addGestureRecognizer(panGesture)
-    }
-
-
-    private func makeVertexBufferSphere() -> MTLBuffer {
-        guard let device = self.device else { fatalError() }
-        vertexCountSphere = sphere.commonSize
-        // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let vertexBuffer = device.makeBuffer(bytes: sphere.vPtr, length: vertexCountSphere * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
-        return vertexBuffer
-    }
-    private func makeVertexBufferMeridians() -> MTLBuffer {
-        guard let device = self.device else { fatalError() }
-        vertexCountMeridians = meridians.commonSize
-        // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let vertexBuffer = device.makeBuffer(bytes: meridians.vPtr, length: vertexCountMeridians * MemoryLayout<SIMD4<Float>>.stride, options: .cpuCacheModeWriteCombined)!
-        return vertexBuffer
-    }
-
-    private func makeTexCoordBufferSphere() -> MTLBuffer {
-       guard let device = self.device else { fatalError() }
-        vertexCountSphere = sphere.commonSize
-        // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let texCoordBuffer = device.makeBuffer(bytes: sphere.tPtr, length: vertexCountSphere * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
-        return texCoordBuffer
-    }
-    private func makeTexCoordBufferMeridians() -> MTLBuffer {
-       guard let device = self.device else { fatalError() }
-        vertexCountSphere = meridians.commonSize
-        // cpuCacheModeWriteCombined -> CPU writes but never reads
-        let texCoordBuffer = device.makeBuffer(bytes: meridians.tPtr, length: vertexCountMeridians * MemoryLayout<SIMD2<Float>>.stride, options: .cpuCacheModeWriteCombined)!
-        return texCoordBuffer
-    }
-
-    private func makePipelineState() -> MTLRenderPipelineState {
-        guard let device = self.device else { fatalError() }
-
-        let scaleFactor: CGFloat = self.contentScaleFactor // Does not change what is shown
-        self.drawableSize = CGSize(width: frame.width*scaleFactor, height: frame.height*scaleFactor)
-
-        do {
-            let library: MTLLibrary  = device.makeDefaultLibrary()!
-
-            let fragmentProgram = library.makeFunction(name: "texturedQuadFragment")
-            let vertexProgram = library.makeFunction(name: "texturedQuadVertex")
-
-            let pQuadPipelineStateDescriptor = MTLRenderPipelineDescriptor()
-            pQuadPipelineStateDescriptor.rasterSampleCount = 1
-            pQuadPipelineStateDescriptor.vertexFunction = vertexProgram
-            pQuadPipelineStateDescriptor.fragmentFunction = fragmentProgram
-
-            do {
-                let renderbufferAttachment: MTLRenderPipelineColorAttachmentDescriptor = pQuadPipelineStateDescriptor.colorAttachments[0]
-                renderbufferAttachment.pixelFormat = .bgra8Unorm
-                renderbufferAttachment.isBlendingEnabled = true
-                renderbufferAttachment.rgbBlendOperation = .add
-                renderbufferAttachment.alphaBlendOperation = .add
-
-                renderbufferAttachment.sourceRGBBlendFactor = .sourceAlpha
-                renderbufferAttachment.destinationRGBBlendFactor = .oneMinusSourceAlpha
-
-                renderbufferAttachment.sourceAlphaBlendFactor = .sourceAlpha
-                renderbufferAttachment.destinationAlphaBlendFactor = .oneMinusSourceAlpha
-            }
-
-            let pipeline = try device.makeRenderPipelineState(descriptor: pQuadPipelineStateDescriptor)
-            return pipeline
-        } catch {
-            print("makeComputePipelineStateerr: \(error.localizedDescription)")
-            fatalError()
-        }
-    }
-
-    required init(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    deinit {
-    }
-
-    override func draw(_ rect: CGRect) {
-print("DRAW!!!")
-assert(self.device != nil)
-assert(self.currentDrawable != nil)
-
-        // Pulling the one-time command buffer from the queue.
-        guard let commandBuffer = metalCommandQueue.makeCommandBuffer(), let renderPassDescriptor = self.currentRenderPassDescriptor else { return }
-
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)
-
-        let renderEncoder: MTLRenderCommandEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor)!
-        renderEncoder.setRenderPipelineState(pipelineRenderState)
-        renderEncoder.setFrontFacing(.counterClockwise)
-
-        var uniforms = Uniforms(projectionMatrix: projectionMatrix, attitudeMatrix: attitudeMatrix, offsetMatrix: offsetMatrix)
-        let bufferPointer = uniformBuffer.contents()
-        memcpy(bufferPointer, &uniforms, MemoryLayout<Uniforms>.size)
-
-        if true {
-            renderEncoder.setVertexBuffer(
-                vertexBufferSphere,
-                offset: 0,
-                index: 0)
-
-            renderEncoder.setVertexBuffer(
-                texCoordBufferSphere,
-                offset: 0,
-                index: 1)
-
-            renderEncoder.setVertexBuffer(
-                uniformBuffer,
-                offset: 0,
-                index: 2)
-
-            renderEncoder.setFragmentTexture(
-                sphere.m_Texture,
-                index: 0)
-
-            // tell the render context we want to draw our primitives. We will draw triangles that's
-            // why we need kQuadVertices and kQuadTexCoords (arrays of points)
-            renderEncoder.drawPrimitives(
-                type: .triangleStrip,
-                vertexStart: 0,
-                vertexCount: vertexCountSphere,
-                instanceCount: 1)
-        }
-
-        if true {
-            renderEncoder.setVertexBuffer(
-                vertexBufferMeridians,
-                offset: 0,
-                index: 0)
-
-            renderEncoder.setVertexBuffer(
-                texCoordBufferMeridians,
-                offset: 0,
-                index: 1)
-
-            renderEncoder.setVertexBuffer(
-                uniformBuffer,
-                offset: 0,
-                index: 2)
-
-            renderEncoder.setFragmentTexture(
-                meridians.m_Texture,
-                index: 0)
-
-            // tell the render context we want to draw our primitives. We will draw triangles that's
-            // why we need kQuadVertices and kQuadTexCoords (arrays of points)
-            renderEncoder.drawPrimitives(
-                type: .triangleStrip,
-                vertexStart: 0,
-                vertexCount: vertexCountMeridians,
-                instanceCount: 1)
-        }
-
-        renderEncoder.endEncoding()
-
-        commandBuffer.present(self.currentDrawable!)
-        commandBuffer.commit()
-    }
-
-    // MARK: UI Related
 
     /// Set of (UITouch*) touches currently active
     private var touches: Set<UITouch> = []
@@ -402,7 +140,6 @@ assert(self.currentDrawable != nil)
         }
         set(VRMode) {
             _vrMode = VRMode
-            let frame = self.frame
             if VRMode {
                 aspectRatio = Float(frame.size.width / (frame.size.height * 0.5))
                 rebuildProjectionMatrix()
@@ -411,6 +148,37 @@ assert(self.currentDrawable != nil)
                 rebuildProjectionMatrix()
             }
         }
+    }
+
+    // MARK: - Inits -
+
+    convenience init() {
+        self.init(frame: UIScreen.main.bounds)
+    }
+
+    override init(frame: CGRect) {
+        guard let context = EAGLContext(api: .openGLES1) else { fatalError() }
+        EAGLContext.setCurrent(context)
+
+        super.init(frame: frame)
+        self.context = context
+
+        initOpenGL(context)
+
+        pinchGesture.isEnabled = false
+        addGestureRecognizer(pinchGesture)
+
+        panGesture.maximumNumberOfTouches = 1
+        panGesture.isEnabled = false
+        addGestureRecognizer(panGesture)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        EAGLContext.setCurrent(nil)
     }
 
     // MARK: - Public -
@@ -432,7 +200,6 @@ assert(self.currentDrawable != nil)
     }
 
     @objc func vector(fromScreenLocation point: CGPoint, inAttitude matrix: GLKMatrix4) -> GLKVector3 {
-        let frame = self.frame
         let inverse = GLKMatrix4Invert(GLKMatrix4Multiply(projectionMatrix, matrix), nil)
         let screen = GLKVector4Make(Float(2.0 * (point.x / frame.size.width - 0.5)), Float(2.0 * (0.5 - point.y / frame.size.height)), 1.0, 1.0)
         //    if (SENSOR_ORIENTATION == 3 || SENSOR_ORIENTATION == 4)
@@ -484,8 +251,6 @@ assert(self.currentDrawable != nil)
         let screenVector = GLKMatrix4MultiplyVector3(matrix, vector)
         let x1 = (screenVector.x / screenVector.z) / 2.0 + 0.5
         let y1 = 0.5 - (screenVector.y / screenVector.z) / 2
-        let frame = self.frame
-
         return CGPoint(
             x: CGFloat(x1) * frame.size.width,
             y: CGFloat(y1) * frame.size.height
@@ -510,14 +275,24 @@ assert(self.currentDrawable != nil)
 
     // MARK:- OPENGL
 
+    private func initOpenGL(_ context: EAGLContext?) {
+        guard let layer = self.layer as? CAEAGLLayer else { fatalError() }
+        layer.isOpaque = false
+        aspectRatio = Float(frame.size.width / frame.size.height)
+        fieldOfView = 45 + 45 * atanf(aspectRatio) // hell ya
+        retinaScale = Float(UIScreen.main.nativeScale)
+        rebuildProjectionMatrix()
+        attitudeMatrix = GLKMatrix4Identity
+        offsetMatrix = GLKMatrix4Identity
+        customGL()
+        makeLatitudeLines()
+    }
 
-#if false
     @objc func draw() {
         // place in GLKViewController's glkView:drawInRect:
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(UInt32(GL_COLOR_BUFFER_BIT))
         if _vrMode {
-            let frame = metalView.frame
             // one eye
             glMatrixMode(UInt32(GL_PROJECTION))
             glViewport(0, 0, GLsizei(frame.size.width * CGFloat(retinaScale)), GLsizei(frame.size.height * CGFloat(retinaScale) * 0.5))
@@ -532,23 +307,25 @@ assert(self.currentDrawable != nil)
             renderScene()
         }
     }
-#endif
-//    func didMoveToSuperview() {
-//        // this breaks MVC, but useful for setting GLKViewController's frame rate
-//        var responder: UIResponder = self as UIResponder
-//        while !(responder is GLKViewController) {
-//            if let next = responder.next {
-//                responder = next
-//            } else {
-//                return
-//            }
-//        }
-//        if let glkVC = responder as? GLKViewController {
-//            glkVC.preferredFramesPerSecond = Self.FPS
-//        }
-//    }
+
+    override func didMoveToSuperview() {
+        // this breaks MVC, but useful for setting GLKViewController's frame rate
+        var responder: UIResponder = self as UIResponder
+        while !(responder is GLKViewController) {
+            if let next = responder.next {
+                responder = next
+            } else {
+                return
+            }
+        }
+        if let glkVC = responder as? GLKViewController {
+            glkVC.preferredFramesPerSecond = Self.FPS
+        }
+    }
 
     private func rebuildProjectionMatrix() {
+        glMatrixMode(UInt32(GL_PROJECTION))
+        glLoadIdentity()
         let frustum: Float = Self.Z_NEAR * tanf(fieldOfView * 0.00872664625997) // pi/180/2
         projectionMatrix = GLKMatrix4MakeFrustum(
             Float(-frustum),
@@ -557,39 +334,43 @@ assert(self.currentDrawable != nil)
             Float(frustum) / aspectRatio,
             Float(Self.Z_NEAR), Float(Self.Z_FAR)
         )
+//        var ma: GLint = 0
+//        glGetIntegerv(UInt32(GL_MATRIX_MODE), &ma)
+//        print("MATRIX:", ma,  GL_PROJECTION_MATRIX, GL_MODELVIEW_MATRIX, GL_TEXTURE_MATRIX) ;   // , GL2.GL_PROJECTION
+//
+//        var m = Array<GLfloat>(repeating: 0, count: 16)
+//        glGetFloatv(UInt32(GL_PROJECTION_MATRIX), &m)
+//        print("M:", m)
 
-//        withUnsafeBytes(of: &projectionMatrix) { bytes in
-//            guard let ptr = bytes.baseAddress else { fatalError() }
-//            let glPtr = ptr.assumingMemoryBound(to: GLfloat.self)
-//            glMultMatrixf(glPtr) // GL_PROJECTION_MATRIX GL_MODELVIEW_MATRIX GL_TEXTURE_MATRIX
-//        }
+        withUnsafeBytes(of: &projectionMatrix) { bytes in
+            guard let ptr = bytes.baseAddress else { fatalError() }
+            let glPtr = ptr.assumingMemoryBound(to: GLfloat.self)
+            glMultMatrixf(glPtr) // GL_PROJECTION_MATRIX GL_MODELVIEW_MATRIX GL_TEXTURE_MATRIX
+        }
 
-#if false
+//        glGetFloatv(UInt32(GL_PROJECTION_MATRIX), &m);
+//        print("M:", m)
+
         if !_vrMode {
-            let frame = metalView.frame
             glViewport(0, 0, GLsizei(frame.size.width), GLsizei(frame.size.height))
         } else {
             // no matter. glViewport gets called every draw call anyway.
         }
         glMatrixMode(UInt32(GL_MODELVIEW))
-#endif
     }
 
 
     private func customGL() {
-#if false
         glMatrixMode(UInt32(GL_MODELVIEW))
         //    glEnable(GL_CULL_FACE);
         //    glCullFace(GL_FRONT);
         //    glEnable(GL_DEPTH_TEST);
         glEnable(UInt32(GL_BLEND))
         glBlendFunc(UInt32(GL_SRC_ALPHA), UInt32(GL_ONE_MINUS_SRC_ALPHA))
-#endif
     }
 
 
     private func renderScene() {
-#if false
         glPushMatrix() // begin device orientation
         attitudeMatrix = GLKMatrix4Multiply(getDeviceOrientationMatrix(), offsetMatrix)
         updateLook()
@@ -616,9 +397,8 @@ assert(self.currentDrawable != nil)
             glColor4f(1.0, 1.0, 1.0, 0.5)
             for touch in touches {
                 glPushMatrix()
-                var touchPoint = CGPoint(x: touch.location(in: metalView).x, y: touch.location(in: metalView).y)
+                var touchPoint = CGPoint(x: touch.location(in: self).x, y: touch.location(in: self).y)
                 if _vrMode {
-                    let frame = metalView.frame
                     touchPoint.y = CGFloat((Int(touchPoint.y) % Int(frame.size.height * 0.5))) * 2.0
                 }
                 drawHotspotLines(vector(fromScreenLocation: touchPoint, inAttitude: attitudeMatrix))
@@ -627,7 +407,6 @@ assert(self.currentDrawable != nil)
             glColor4f(1.0, 1.0, 1.0, 1.0)
         }
         glPopMatrix() // end device orientation
-#endif
     }
 
     // Mark: - ORIENTATION -
@@ -685,7 +464,6 @@ assert(self.currentDrawable != nil)
 
         let x1 = (screenVector.x / screenVector.z) / 2.0 + 0.5
         let y1 = 0.5 - (screenVector.y / screenVector.z) / 2
-        let frame = self.frame
         location = CGPoint(x: CGFloat(x1) * frame.size.width, y: CGFloat(y1) * frame.size.height)
         return screenVector.z >= 0
     }
@@ -702,7 +480,6 @@ assert(self.currentDrawable != nil)
     }
 
     private func drawHotspotLines(_ touchLocation: GLKVector3) {
-#if false
         glLineWidth(2.0)
         let scale = sqrtf(1 - powf(touchLocation.y, 2))
         glPushMatrix()
@@ -724,7 +501,6 @@ assert(self.currentDrawable != nil)
         glDrawArrays(UInt32(GL_LINE_STRIP), 0, GLsizei(33))
         glDisableClientState(UInt32(GL_VERTEX_ARRAY))
         glPopMatrix()
-#endif
     }
 
     // MARK: - Touches -
@@ -770,12 +546,9 @@ assert(self.currentDrawable != nil)
 
     @objc func panHandler(_ sender: UIPanGestureRecognizer?) {
         guard let sender = sender else { return }
-        let frame = self.frame
 
         if sender.state.rawValue == 1 {
             var location = sender.location(in: sender.view)
-            let frame = self.frame
-
             if lockPanToHorizon {
                 location.y = frame.size.height / 2.0
             }
